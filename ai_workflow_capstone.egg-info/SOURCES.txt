@@ -1,0 +1,12 @@
+README.md
+setup.py
+ai_workflow_capstone.egg-info/PKG-INFO
+ai_workflow_capstone.egg-info/SOURCES.txt
+ai_workflow_capstone.egg-info/dependency_links.txt
+ai_workflow_capstone.egg-info/top_level.txt
+server_side/__init__.py
+server_side/config_module.py
+server_side/ingestion_module.py
+server_side/logger_module.py
+server_side/model_module.py
+server_side/preprocessing_module.py

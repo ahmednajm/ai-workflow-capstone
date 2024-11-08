@@ -1,0 +1,6 @@
+unique_id,timestamp,mode,country,target_date,y_pred,y_proba,test_set_rmse,runtime
+415cb8c6-38e1,12:24:00,prod,all,2018-10-30,175200.33,None,3872,00:00:03
+31a1d1d5-8df7,12:28:17,prod,all,2019-07-01,81677.69,None,3872,00:00:03
+f65202da-9042,17:04:36,prod,United Kingdom,2019-07-01,76332.21,None,3565,00:00:03
+ae5f2d01-54f0,17:05:25,prod,United Kingdom,2018-10-01,119121.81,None,3565,00:00:03
+0a34ccde-b6bf,18:15:55,prod,United Kingdom,2016-10-01,None,None,None,None
