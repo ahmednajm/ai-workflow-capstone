@@ -1,0 +1,8 @@
+unique_id|date|timestamp|mode|country|date_range|model_name|scaler_name|best_model_parameters|eval_metrics|version|runtime
+6ae5622e-71ee|2024-11-18|17:28:29|prod|World|[2017-11-29, 2019-07-01]|ExtraTreesRegressor|RobustScaler|{'max_depth': 5, 'n_estimators': 120, 'criterion': 'squared_error'}|{'RMSE': 4746, 'MAPE': 4.2}|v07_2019|00:00:24
+e9fd6e2d-5c05|2024-11-18|18:37:12|prod|World|[2017-11-29, 2019-07-31]|ExtraTreesRegressor|RobustScaler|{'max_depth': 5, 'n_estimators': 120, 'criterion': 'squared_error'}|{'RMSE': 5969, 'MAPE': 4.8}|v08_2019|00:00:24
+c1cfa1f1-d958|2024-11-18|17:30:16|prod|United Kingdom|[2017-11-29, 2019-07-01]|ExtraTreesRegressor|RobustScaler|{'max_depth': 5, 'n_estimators': 110, 'criterion': 'squared_error'}|{'RMSE': 4447, 'MAPE': 4.1}|v07_2019|00:00:21
+5056b58c-c46d|2024-11-18|18:35:19|prod|United Kingdom|[2017-11-29, 2019-07-31]|ExtraTreesRegressor|RobustScaler|{'max_depth': 5, 'n_estimators': 120, 'criterion': 'squared_error'}|{'RMSE': 5883, 'MAPE': 4.4}|v08_2019|00:00:25
+794b05fa-6547|2024-11-19|18:40:37|prod|World|[2017-11-29, 2019-07-31]|ExtraTreesRegressor|RobustScaler|{'max_depth': 5, 'n_estimators': 120, 'criterion': 'squared_error'}|{'RMSE': 5969, 'MAPE': 4.8}|v08_2019|00:00:25
+4c95bcab-7d72|2024-11-19|18:44:40|prod|World|[2017-11-29, 2019-07-31]|ExtraTreesRegressor|RobustScaler|{'max_depth': 5, 'n_estimators': 120, 'criterion': 'squared_error'}|{'RMSE': 5969, 'MAPE': 4.8}|v08_2019|00:00:28
+4dffa9a7-f6a3|2024-11-19|18:45:22|prod|World|[2017-11-29, 2019-07-31]|ExtraTreesRegressor|RobustScaler|{'max_depth': 5, 'n_estimators': 120, 'criterion': 'squared_error'}|{'RMSE': 5969, 'MAPE': 4.8}|v08_2019|00:00:25

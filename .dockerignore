@@ -1,0 +1,22 @@
+# Exclude data and logs directories
+data/
+server_side/server_logs/
+server_side/training_data/
+server_side/models/
+
+# Exclude notebooks
+notebooks/
+
+# Exclude the virtual environment
+venv/
+
+# Exclude unnecessary files
+*.pyc
+*.pyo
+*.pkl
+__pycache__/
+
+# Exclude unnecessary folders
+ai_workflow_capstone.egg-info
+.ipynb_checkpoints
+.vscode

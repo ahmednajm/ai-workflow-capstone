@@ -1,7 +1,8 @@
-import os
-import time
-import uuid
+#!/usr/bin/env python3
+
+import os, time, uuid, glob
 from datetime import date, datetime
+import pandas as pd
 from loguru import logger
 
 LOG_DIR = os.path.join(os.path.dirname(__file__), '.', "server_logs")
@@ -23,97 +24,109 @@ def write_header_if_needed(logfile: str, header: str) -> None:
             f.write(header + "\n")
 
 
-def update_train_log(country: str, date_range: str, metric: str, runtime: float, 
-                     version: int, mode: str, model_name: str, scaler_name: str, 
-                     best_grid_parameters: str) -> None:
+def update_train_log(mode: str, country: str, date_range: str, 
+                     model_name: str, scaler_name: str, best_grid_parameters: str, 
+                     eval_metrics: str, version: str, runtime: float) -> None:
     """
     Append a new entry to the training log file with details about the model training run.
-
     Parameters:
+        mode : The mode of the training (e.g., 'train').
         country : The country for which the model is trained.
         date_range : The date range for the training data.
-        metric : The metric used for evaluation.
-        runtime : The time taken for the training process.
-        version : The version number of the model.
-        mode : The mode of the training (e.g., 'train').
         model_name : The name of the model being trained.
         scaler_name : The name of the scaler used.
         best_grid_parameters : The best parameters found after the grid search
+        eval_metrics : The metric used for evaluation.
+        version : The version number of the model.
+        runtime : The time taken for the training process.
     """
+    
     # Configure logger to log CSV-like structured entries
-    today_str = date.today().strftime("%Y-%m-%d")
-    train_logfile = os.path.join(LOG_DIR, f"{mode}-trained_on_{today_str}_logfile.csv")
-    logger.add(train_logfile, format="{message}", rotation="00:00", retention="60 days")
+    train_logfile = os.path.join(LOG_DIR, f"{mode}-training-logfile.csv")
+    logger.add(train_logfile , 
+               format = "{message}" , 
+               retention = None ,
+               rotation = None)
 
     # Define the header
-    header = "unique_id,timestamp,date_range,country,model_version,runtime,mode,model_name,scaler_name,best_model_parameters,metric"
+    header = "unique_id|date|timestamp|mode|country|date_range|model_name|scaler_name|best_model_parameters|eval_metrics|version|runtime"
+              
     write_header_if_needed(train_logfile, header)
 
     # Prepare log data
     log_data = {
         "unique_id": str(uuid.uuid4())[:13],
+        "date": date.today().strftime("%Y-%m-%d"),
         "timestamp": datetime.fromtimestamp(time.time()).strftime("%H:%M:%S"),
-        "date_range": date_range,
-        "country": country,
-        "model_version": f'v{version}',
-        "runtime": runtime,
         "mode": mode,
+        "country": country,
+        "date_range": date_range,
         "model_name": model_name,
         "scaler_name": scaler_name,
         "best_model_parameters": best_grid_parameters,
-        "metric": metric}
+        "eval_metrics": eval_metrics,
+        "version": version,
+        "runtime": runtime}
 
     # Format data as CSV line and log it
-    csv_line = ",".join(str(value) for value in log_data.values())
+    csv_line = "|".join(str(value) for value in log_data.values())
     logger.info(csv_line)
-    print(f"\nTraining log entry saved to {train_logfile}\n")
 
-
-def update_predict_log(country: str, target_date: str, y_pred: str, y_proba: list, 
-                       runtime: str, rmse: int, mode: str) -> None:
+              
+def update_predict_log(mode: str, country: str, date_range: str, target_date: str, 
+                       y_pred: str, y_proba: list, rmse: int, version: str, runtime: str) -> None:  
     """
     Update the prediction log file with the prediction results.
-
     Parameters:
+        mode (str): The mode of the prediction (e.g., 'predict').
         country (str): The country for which the prediction is made.
+        date_range (str): The date range for the training data.
         target_date (str): The date of the prediction.
         y_pred (str): The predicted value.
         y_proba (list): The predicted probabilities.
-        runtime (str): The time taken for the prediction process.
         rmse (int): The root mean square error of the prediction.
-        mode (str): The mode of the prediction (e.g., 'predict').
+        version : The version of the model.
+        runtime (str): The time taken for the prediction process.
+        y_actual_previous
     """
+
     # Configure logger to log CSV-like structured entries
-    today_str = date.today().strftime("%Y-%m-%d")
-    predict_logfile = os.path.join(LOG_DIR, f"{mode}-predicted_on_{today_str}_logfile.csv")
-    logger.add(predict_logfile, format="{message}", rotation="00:00", retention="60 days")
-    
+    predict_logfile = os.path.join(LOG_DIR, f"{mode}-predictions-logfile.csv")
+    logger.add(predict_logfile , 
+               format = "{message}" , 
+               retention = None ,
+               rotation = None)
     # Define the header
-    header = "unique_id,timestamp,mode,country,target_date,y_pred,y_proba,test_set_rmse,runtime"
+    header = "unique_id|date|timestamp|mode|country|date_range|target_date|y_pred|y_proba|test_set_rmse|version|runtime"#|y_actual_previous"
+              
     write_header_if_needed(predict_logfile, header)
 
     # Prepare log data
     log_data = {
         "unique_id": str(uuid.uuid4())[:13],
+        "date":  date.today().strftime("%Y-%m-%d"),
         "timestamp": datetime.fromtimestamp(time.time()).strftime("%H:%M:%S"),
         "mode": mode,
         "country": country,
+        "date_range": date_range,
         "target_date": target_date,
         "y_pred": y_pred,
         "y_proba": y_proba,
         "rmse": rmse,
-        "runtime": runtime}
+        "version": version,
+        "runtime": runtime,
+        #"y_actual_previous": y_actual_previous
+        }
     
     # Format data as CSV line and log it
-    csv_line = ",".join(str(value) for value in log_data.values())
+    csv_line = "|".join(str(value) for value in log_data.values())
     logger.info(csv_line)
-    print(f"\nPrediction log entry saved to {predict_logfile}\n")
     
     
-def _is_validate_date(year: int, month: int, day: int) -> bool:
+def _is_validate_date(year: int, month: int) -> bool:
     """Validate if the given year, month, and day form a valid date."""
     try:
-        datetime(year, month, day)
+        datetime(year, month)
         return True
     except ValueError:
         return False
@@ -122,9 +135,9 @@ def _parse_logs(logs) -> list:
     """Parse the log entries, expecting a list of CSV lines."""
     if logs is None or logs == [] or not isinstance(logs, list):
         return []
-    return [line.split(",") for line in logs]
+    return [line.split("|") for line in logs]
 
-def get_log(mode: str, task: str, year: int, month: int, day: int) -> list:
+def get_logs(mode: str, task: str, year: int, month: int) -> list:
     """Retrieve logs based on the mode, task, and date.
 
     Parameters:
@@ -132,24 +145,96 @@ def get_log(mode: str, task: str, year: int, month: int, day: int) -> list:
         task (str): The task associated with the logs (e.g., 'training', 'prediction').
         year (int): The year of the logs to retrieve.
         month (int): The month of the logs to retrieve.
-        day (int): The day of the logs to retrieve.
 
     Returns:
         list: A list of log entries, or an empty list if no logs are found.
     """
-    if not _is_validate_date(year, month, day):
-        print(f"\nInvalid date: Year: {year}, Month: {month}, Day: {day}\n")
-        return
     
-    target_date = f"{year}-{str(month).zfill(2)}-{str(day).zfill(2)}"
-    log_filename = f"{mode}-{task}ed_on_{target_date}_logfile.csv" 
-    log_path = os.path.join(LOG_DIR, log_filename)
+    target_date = f"{year}-{str(month).zfill(2)}"
+    log_filename_pattern = os.path.join(LOG_DIR, f"{mode}-{task}*-logfile.csv")
+    
+    # find files matching the pattern
+    log_filenames = glob.glob(log_filename_pattern)
+    
+    # Check if files were found
+    if not log_filenames:
+        print(f"\nNo log files found for {task} in mode: {mode}\n")
+        return None
 
-    if os.path.exists(log_path) and os.path.isfile(log_path):
-        with open(log_path, "r") as f:
+    # Get the file
+    log_filename = log_filenames[0]
+    log_filename_path = os.path.join(LOG_DIR, log_filename)
+
+    # Check if the file exists and is a valid file
+    if os.path.exists(log_filename_path) and os.path.isfile(log_filename_path):
+        with open(log_filename_path, "r") as f:
             log_lines = f.read().splitlines()
             return _parse_logs(log_lines)
     else:
-        print(f"\nNo log found for {task} in mode: {mode} on date: {target_date}\n")
-        return
+        print(f"\nThe log file {log_filename_path} does not exist or is not a valid file.\n")
+        return None
 
+
+def get_log(mode: str, task: str, year: int, month: int) -> list:
+    
+    # List all files in the log directory
+    all_files = os.listdir(LOG_DIR)
+    # Filter log files based on task and mode
+    log_file_name = [filename for filename in all_files if f"{mode}-{task}" in filename][0]
+    #
+    log_file_path = os.path.join(os.path.dirname(__file__), LOG_DIR, log_file_name)
+    # 
+    print('\log_file:\n\n',log_file_path,'\n')
+
+    log_file_df = pd.read_csv(log_file_path,
+                                  sep='|')    
+    
+    target = f"{year:04d}-{month:02d}"
+    
+    # Filtrer les lignes où target est dans date_range
+    filtered_df = log_file_df[
+        log_file_df['date_range'].str.contains(target)
+    ]
+    
+    return filtered_df
+
+
+def update_training_data_drift_log(mode, country, version, 
+                     outliers_X_threshold, wasserstein_X_threshold, wasserstein_y_threshold,
+                     outliers_X_percentage, wasserstein_X, wasserstein_y) -> None: 
+     
+    # Configure logger to log CSV-like structured entries
+    drift_logfile = os.path.join(LOG_DIR, f"{mode}-training-data-drift-logfile.csv")
+    logger.add(drift_logfile , 
+               format = "{message}" , 
+               retention = None ,
+               rotation = None)
+
+    # Define the header
+    header = "date|mode|country|version|outliers_X_threshold|wasserstein_X_threshold|wasserstein_y_threshold|outliers_X_percentage|wasserstein_X|wasserstein_y"
+              
+    write_header_if_needed(drift_logfile, header)
+
+    # Prepare log data
+    log_data = {
+        "date": date.today().strftime("%Y-%m-%d"),
+        "mode": mode,
+        "country": country,
+        "version": version,
+        "outliers_X_threshold": outliers_X_threshold,
+        "wasserstein_X_threshold": wasserstein_X_threshold,
+        "wasserstein_y_threshold": wasserstein_y_threshold,
+        "outliers_X_percentage": outliers_X_percentage,
+        "wasserstein_X": wasserstein_X,
+        "wasserstein_y": wasserstein_y,
+    }
+
+    # Format data as CSV line and log it
+    csv_line = "|".join(str(value) for value in log_data.values())
+    logger.info(csv_line)
+
+if __name__ == "__main__":
+    
+    
+    desired_log = get_log(mode='dev', task='train', year=2019, month=7)
+    print(desired_log)

@@ -1,7 +1,6 @@
+#!/usr/bin/env python3
 
 import time, os
-from collections import defaultdict
-
 import pandas as pd
 import scipy.stats as stats                                
 
@@ -11,7 +10,7 @@ warnings.filterwarnings('ignore')
 from server_side.ingestion_module import load_json_data
 
 
-def check_missing_values(df, printing):
+def _check_missing_values(df, printing):
     """
     Check for missing values in the dataframe and summarize them.
     Parameters:
@@ -36,7 +35,7 @@ def check_missing_values(df, printing):
                 print(f"\nThere are {missing_count:,.0f} missing values in the {column} column.\n")
 
 
-def drop_duplicate_data(df, printing):
+def _drop_duplicate_data(df, printing):
     """
     Removes duplicate rows from the DataFrame and prints a summary of the operation.
     Parameters:
@@ -57,7 +56,7 @@ def drop_duplicate_data(df, printing):
     return df_dropped_duplicate_data
 
 
-def drop_invalid_data(df, printing):
+def _drop_invalid_data(df, printing):
     """
     Exclude rows with invalid data based on price and times viewed.
     Parameters:
@@ -95,7 +94,7 @@ def drop_invalid_data(df, printing):
     return df_dropped_invalid_data
     
 
-def detect_outliers(df, column, z_threshold):
+def _detect_outliers(df, column, z_threshold):
     """
     Detects outliers in a specified column based on Z-score and IQR methods.
     Parameters:
@@ -133,8 +132,7 @@ def detect_outliers(df, column, z_threshold):
     return outlier_mask
 
 
-
-def drop_outliers(df, printing):
+def _drop_outliers(df, printing):
     """
     Drops rows with outliers in numerical columns.
     Parameters:
@@ -158,7 +156,7 @@ def drop_outliers(df, printing):
         print(f'\nThe numerical columns are : {" and ".join(numerical_cols)}\n')
 
     for col in numerical_cols:
-        col_outliers = detect_outliers(df, column=col, z_threshold=3)
+        col_outliers = _detect_outliers(df, column=col, z_threshold=3)
         df_with_col_outliers = df[col_outliers]
         if printing:
             print(f"\nThere are {(len(df_with_col_outliers)):,.0f} rows identified with outliers in {col} data")
@@ -181,7 +179,8 @@ def drop_outliers(df, printing):
     return df_dropped_outliers
 
 
-def data_cleaning_pipeline(original_loaded_df, clean_data_dir ,country, printing):
+
+def data_cleaning_pipeline(df, country, printing):
     """
     Applies data cleaning functions to remove duplicates, invalid data, and outliers.
     Parameters:
@@ -191,66 +190,48 @@ def data_cleaning_pipeline(original_loaded_df, clean_data_dir ,country, printing
     - printing (bool)      : Flag to print results.
     Returns: pd.DataFrame  : Cleaned DataFrame.
     """
-    
-    print(f"\n... Starting data cleaning pipeline for {country}")
-    
+        
     # Filter by country if a specific country is provided
-    if country != 'all':
-        original_loaded_df = original_loaded_df[original_loaded_df['country'] == country]
+    if country != 'World':
+        df = df[df['country'] == country]
 
-    # Step 1: Drop duplicate data
-    clean_df = drop_duplicate_data(original_loaded_df, printing)
-
-    # Step 2: Drop invalid data
-    clean_df = drop_invalid_data(clean_df, printing)
-
-    # Step 3: Drop outliers
-    clean_df = drop_outliers(clean_df, printing)
-
-    # Save the cleaned DataFrame to a CSV file   
-    output_filename = os.path.join(clean_data_dir, f'{country}_cleaned_data.csv')
-    clean_df.to_csv(output_filename, index=False)
-    print(f"cleaned data saved to {output_filename}")
-
-    print(f"Data cleaning pipeline completed for {country}.\n")
+    clean_df = _drop_duplicate_data(df, printing)
+    clean_df = _drop_invalid_data(clean_df, printing)
+    clean_df = _drop_outliers(clean_df, printing)
+    clean_df = clean_df.reset_index(drop=True)
     
     return clean_df
 
-
-def time_series_df(clean_data_dir, country):
+def create_time_series(df):
     """
     Converts cleaned data into a time-series DataFrame with aggregated daily metrics.
     Parameters:
     - clean_data_dir (str) : Directory of cleaned data.
     - country (str)        : Country for which to create the time-series DataFrame.
+    - ts_data_dir (str)    : Directory to store time series data.
     Returns: pd.DataFrame  : Time-series DataFrame.
     """
-        
-    try:
-        clean_df = pd.read_csv(f"{clean_data_dir}/{country}_cleaned_data.csv")
-    except FileNotFoundError:
-        raise Exception("Country not found")
-
+    
     ## Ensure dates are in datetime format
-    clean_df['date'] = pd.to_datetime(clean_df['date'])
+    df['date'] = pd.to_datetime(df['date'])
     
     ## Sort the DataFrame by date to fit the logic below
-    clean_df.sort_values(by='date',inplace=True)
+    df.sort_values(by='date',inplace=True)
 
     # Create a date range from the minimum date to the maximum date
-    start_date = clean_df['date'].min()
-    end_date = clean_df['date'].max()
+    start_date = df['date'].min()
+    end_date = df['date'].max()
     days = pd.date_range(start=start_date, end=end_date, freq='D')
 
     # Aggregate the dataframe by 'date'
-    time_series_df = (clean_df.groupby('date')
+    time_series_df = (df.groupby('date')
                       .agg(purchases=('date', 'size'),                   # Transaction count
                            unique_invoices=('invoice_id', 'nunique'),    # Unique invoice count
                            unique_streams=('stream_id', 'nunique'),      # Unique stream count
                            total_views=('times_viewed', 'sum'),          # Sum of views
                            revenue=('price', 'sum')                      # Sum of revenue
                           )
-                      .reindex(days, fill_value=0)                       # Reindexing to include all days
+                      .reindex(days, fill_value=0)                       # Re-indexing to include all days
                       .reset_index()                                     # Reset index
                      )
 
@@ -259,103 +240,155 @@ def time_series_df(clean_data_dir, country):
 
     # Add a 'year-month' column
     time_series_df['year-month'] = time_series_df['date'].dt.to_period('M').astype(str)
-
+    
     return time_series_df
 
 
-def engineer_features(data_dir, country, training):
+def _get_dynamic_look_ahead_days(date):
+    """
+    Function to get dynamic look-ahead days based on month and year
+    """
+    month_days = (pd.Timestamp(year=date.year,
+                               month=date.month,
+                               day=1)
+                  .days_in_month)  # Days in the current month
+    
+    # Limit to 30 days for months longer than 30 days
+    return pd.Timedelta(days=min(month_days, 30))  
+
+
+def _get_dynamic_look_back_days(date):
+    """ 
+    Function to get dynamic look-back days based on month and year
+    """
+    previous_month = date - pd.DateOffset(months=1)
+    prev_month_days = (pd.Timestamp(year=previous_month.year,
+                                    month=previous_month.month,
+                                    day=1)
+                       .days_in_month)
+    
+    return pd.Timedelta(days=min(prev_month_days, 30))
+
+
+def _get_30_day_revenue(df, date):
+    """
+    Calculate 30-day target revenue with dynamic look-ahead
+    """
+    look_ahead = _get_dynamic_look_ahead_days(date)
+    filter_cond = (df['date'] >= date) & (df['date'] < date + look_ahead)
+    
+    return df.loc[filter_cond, 'revenue'].sum()
+
+
+def _get_previous_year_revenue(df, date):
+    """
+    Calculate revenue from the same period in the previous year with dynamic look-ahead
+    """
+    look_ahead = _get_dynamic_look_ahead_days(date - pd.DateOffset(years=1))
+    start = date - pd.DateOffset(years=1)
+    filter_cond = (df['date'] >= start) & (df['date'] < start + look_ahead)
+    
+    return df.loc[filter_cond, 'revenue'].sum()
+
+
+def _get_recent_views(df, date):
+    """
+    Calculate average views over the last 30 days with dynamic look-back
+    """
+    look_back = _get_dynamic_look_back_days(date)
+    filter_cond = (df['date'] >= date - look_back) & (df['date'] < date)
+    recent_views = df.loc[filter_cond, 'total_views']
+    return recent_views.mean() if not recent_views.empty else 0
+
+
+def preprocessing(df, country, preprocessed_data_dir):
     """
     Creates features for modeling based on time-series data.
     Parameters:
-    - data_dir (str)      : Directory containing cleaned data.
-    - country (str)       : Country to engineer features for.
-    - training (bool)     : Flag for training to exclude recent data.
+    - data_dir (str)                      : Directory containing cleaned data.
+    - country (str)                       : Country to engineer features for.
+    - training (bool)                     : Flag for training to exclude recent data.
+    - features_engineering_data_dir (str) : Directory to store time series data.
+
     Returns: pd.DataFrame : Feature matrix X, target vector y, and dates.
     """
-    engineer_features_time_start = time.time()
-
-    ts_df = time_series_df(data_dir, country=country)
-    ts_df = ts_df[['date', 'revenue', 'purchases', 'total_views']]
-    ts_df['date'] = pd.to_datetime(ts_df['date'], errors='coerce')
-
-    # Initialize dictionaries to store features and target values
-    eng_features = defaultdict(list)
-    y = []
-
+        
     # Define the look-back periods (in days) for feature engineering
     previous_days = [7, 14, 28, 70]
 
     # Calculate rolling sums for revenue for each period and shift to align with target
     for num_days in previous_days:
-        ts_df[f'revenue_{num_days}'] = ts_df['revenue'].rolling(window=num_days, min_periods=1).sum().shift(1)
-
-    # Iterate over each row in the DataFrame
-    for idx, row in ts_df.iterrows():
-        current_date = row['date']
-
-        # Append engineered features
-        for num_days in previous_days:
-            eng_features[f'previous_{num_days}'].append(row[f'revenue_{num_days}'])
-
-        # Target: Sum revenue for the next 30 days
-        target_sum = ts_df[(ts_df['date'] >= current_date) & (ts_df['date'] < current_date + pd.Timedelta(days=30))]['revenue'].sum()
-        y.append(target_sum)
+        df[f'previous_{num_days}_days_revenue'] = df['revenue'].rolling(window=num_days, min_periods=1).sum().shift(1)
         
-        # Previous year revenue for trend analysis
-        prev_year_start = current_date - pd.DateOffset(years=1)
-        prev_year_revenue = ts_df[(ts_df['date'] >= prev_year_start) & (ts_df['date'] < prev_year_start + pd.DateOffset(days=30))]['revenue'].sum()
-        eng_features['previous_year'].append(prev_year_revenue)
-        
-        # Non-revenue features: Average invoices and views over the last 30 days
-        recent_data = ts_df[(ts_df['date'] >= current_date - pd.Timedelta(days=30)) & (ts_df['date'] < current_date)]
-        eng_features['recent_views'].append(recent_data['total_views'].mean() if not recent_data.empty else 0)
+    # Calculate 30-day target revenue
+    df['target_next_30_days_revenue'] = df['date'].apply(lambda date: _get_30_day_revenue(df, date))
+
+    # Calculate revenue from the same period in the previous year
+    df['previous_year_revenue'] = df['date'].apply(lambda date: _get_previous_year_revenue(df, date))
+
+    # Calculate average views over the last 30 days
+    df['previous_30_days_views'] = df['date'].apply(lambda date: _get_recent_views(df, date))
+
+    # Drop 'total_views'
+    del df['total_views']
+
+    # Drop rows with missing values for required features and reset index
+    df.dropna( subset = [f'previous_{num_days}_days_revenue' for num_days in previous_days] + \
+                        ['target_next_30_days_revenue', 'previous_30_days_views'],
+               inplace=True)
+    df.reset_index(drop=True, inplace=True)
+
+    # Reorder the columns
+    columns_order = ['date', 'previous_30_days_views', 'previous_year_revenue'] + \
+                    [f'previous_{num_days}_days_revenue' for num_days in previous_days] + \
+                    ['revenue', 'target_next_30_days_revenue']
+    preprocessed_df = df[columns_order]
+
+    # Save the time series DataFrame to a CSV file   
+    preprocessed_data_filename = os.path.join(preprocessed_data_dir, f'{country}_preprocessed_data.csv')
+    preprocessed_df.to_csv(preprocessed_data_filename)
     
-    # Convert the features dictionary to a DataFrame
-    X = pd.DataFrame(eng_features)
-    y = pd.Series(y, name='target')
-    dates = ts_df['date']
+    return preprocessed_df
 
-    # Remove rows with all zeros (in cases where no data exists for look-back periods)
-    X = X[(X != 0).any(axis=1)]
-    y = y[X.index]
-    dates = dates[X.index]
-
-    # If training, exclude the last 30 days to ensure target reliability
-    if training:
-        X = X.iloc[:-30]
-        y = y.iloc[:-30]
-        dates = dates.iloc[:-30]
-        
-    # Reset index for neatness
-    X.reset_index(drop=True, inplace=True)
-    y.reset_index(drop=True, inplace=True)
-    dates.reset_index(drop=True, inplace=True)
-
-    # Calculate runtime duration
-    m, s = divmod(time.time() - engineer_features_time_start, 60)
-    h, m = divmod(m, 60)
-    engineer_features_runtime = "%02d:%02d" % (m, s)
     
-    return X, y, dates
-
+########################################################################################################
 
 if __name__ == "__main__":
     
-    #SOURCE_DATA_DIR = 'data/source_data/cs-train'
     SOURCE_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'source_data', 'cs-train')
-    CLEAN_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'clean_data')
+                
+    PREPROCESSED_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'preprocessed_data')
 
-    ## Loading data
+########################################################################################################
+    
+    time_start = time.time()
+
+    if not os.path.exists(PREPROCESSED_DATA_DIR):
+        os.makedirs(PREPROCESSED_DATA_DIR)
+
+    ## Loading source data
     print(f"\n... Loading source data")
     original_loaded_df = load_json_data(SOURCE_DATA_DIR) 
-    print(f"\nSource data loaded successfully \n")
-    
-    ## Cleaning data and saving it as csv for each country in original_loaded_df
-    for country in original_loaded_df.country.unique() :
-        data_cleaning_pipeline(original_loaded_df, CLEAN_DATA_DIR, country, printing=False)
+    print(f"Source data loaded successfully")
+        
+    #for country in list(original_loaded_df.country.unique()) + ['World']:
+    for country in ['United Kingdom', 'World']:
 
-    ## Cleaning data and saving it as csv for all countries in original_loaded_df
-    data_cleaning_pipeline(original_loaded_df, CLEAN_DATA_DIR, 'all', printing=True)
-    
+        print(f"\n... Cleaning source data for {country}")
+        clean_df = data_cleaning_pipeline(original_loaded_df, country, printing=False)
+        print(f"Source data cleaned successfully for {country}")
 
+        print(f"... Creating time series data for {country}")
+        ts_df    = create_time_series(clean_df)
+        print(f"Time series data created successfully for {country}")
+
+        print(f"... Preprocessing data for {country}")
+        preprocessing(ts_df, country, PREPROCESSED_DATA_DIR)
+        print(f"Data preprocessed successfully for {country}")
+
+    # Calculate runtime duration
+    m, s = divmod(time.time() - time_start, 60)
+    h, m = divmod(m, 60)
+    time_start = "%02d:%02d" % (m, s)
     
+    print('\nPreprocessing runtime', time_start)

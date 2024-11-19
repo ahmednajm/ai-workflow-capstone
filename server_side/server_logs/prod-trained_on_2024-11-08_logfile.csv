@@ -1,3 +1,0 @@
-unique_id,timestamp,date_range,country,model_version,runtime,mode,model_name,scaler_name,best_model_parameters,metric
-8aa7638d-dbff,11:35:54,2017-11-29:2019-07-01,all,v1,00:00:53,prod,ExtraTreesRegressor,RobustScaler,[max_depth=5, n_estimators=110, criterion='squared_error'],[RMSE=3872, MAPE=3.6%]
-f8c8d3fc-ee52,11:39:39,2017-11-29:2019-07-01,all,v2,00:01:05,prod,RandomForestRegressor,StandardScaler,[max_depth=5, n_estimators=130, criterion='squared_error'],[RMSE=4880, MAPE=4.6%]

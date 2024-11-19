@@ -1,0 +1,3 @@
+date|mode|country|version|outliers_X_threshold|wasserstein_X_threshold|wasserstein_y_threshold|outliers_X_percentage|wasserstein_X|wasserstein_y
+2024-11-18|prod|United Kingdom|v08_2019|1.03|726.34|2506.52|True|False|False
+2024-11-18|prod|World|v08_2019|1.03|782.12|2689.16|True|False|False
