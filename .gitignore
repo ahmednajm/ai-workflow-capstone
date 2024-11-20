@@ -1,0 +1,12 @@
+# Exclude the virtual environment
+venv/
+
+# Exclude unnecessary files
+*.pyc
+*.pyo
+__pycache__/
+
+# Exclude unnecessary folders
+ai_workflow_capstone.egg-info
+.ipynb_checkpoints
+.vscode
